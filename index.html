@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full Sensor Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-5px); }
+        .metric-value { font-size: 2.5rem; font-weight: 700; color: #333; }
+        .metric-unit { font-size: 1rem; color: #777; font-weight: normal; }
+        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+        .status-online { background-color: #d1e7dd; color: #0f5132; }
+        .status-offline { background-color: #f8d7da; color: #842029; }
+        
+        /* Specific Colors for Sensors */
+        .border-left-blue { border-left: 5px solid #0d6efd; }
+        .border-left-red { border-left: 5px solid #dc3545; }
+        .border-left-green { border-left: 5px solid #198754; }
+        .border-left-purple { border-left: 5px solid #6f42c1; }
+    </style>
+</head>
+<body>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">💧 Water Quality Monitor</h2>
+            <small class="text-muted">Real-time Sensor Data</small>
+        </div>
+        <div id="connectionStatus" class="status-badge status-offline">
+            Disconnected
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        
+        <div class="col-md-3 col-sm-6">
+            <div class="card h-100 p-3 border-left-blue">
+                <h6 class="text-muted text-uppercase mb-2">Turbidity</h6>
+                <div class="d-flex align-items-baseline">
+                    <span id="ntuValue" class="metric-value">--</span>
+                    <span class="metric-unit ms-1">NTU</span>
+                </div>
+                <small class="text-muted mt-2">Voltage: <span id="voltageValue">--</span> V</small>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="card h-100 p-3 border-left-red">
+                <h6 class="text-muted text-uppercase mb-2">Temperature</h6>
+                <div class="d-flex align-items-baseline">
+                    <span id="tempValue" class="metric-value">--</span>
+                    <span class="metric-unit ms-1">°C</span>
+                </div>
+                <small id="tempStatus" class="text-success mt-2">Normal</small>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="card h-100 p-3 border-left-green">
+                <h6 class="text-muted text-uppercase mb-2">pH Level</h6>
+                <div class="d-flex align-items-baseline">
+                    <span id="phValue" class="metric-value">--</span>
+                    <span class="metric-unit ms-1">pH</span>
+                </div>
+                <small class="text-muted mt-2">Target: 6.5 - 8.5</small>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="card h-100 p-3 border-left-purple">
+                <h6 class="text-muted text-uppercase mb-2">TDS Value</h6>
+                <div class="d-flex align-items-baseline">
+                    <span id="tdsValue" class="metric-value">--</span>
+                    <span class="metric-unit ms-1">ppm</span>
+                </div>
+                <small class="text-muted mt-2">Total Dissolved Solids</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Live Trends</h5>
+                    </div>
+                <canvas id="mainChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Chart Setup ---
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    const mainChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Turbidity (NTU)',
+                    data: [],
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    yAxisID: 'y',
+                    fill: true
+                },
+                {
+                    label: 'Temperature (°C)',
+                    data: [],
+                    borderColor: '#dc3545',
+                    borderDash: [5, 5], // Dashed line for Temp
+                    yAxisID: 'y1',
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: { display: false },
+                y: { 
+                    type: 'linear', 
+                    display: true, 
+                    position: 'left',
+                    title: { display: true, text: 'Turbidity (NTU)' }
+                },
+                y1: { 
+                    type: 'linear', 
+                    display: true, 
+                    position: 'right',
+                    grid: { drawOnChartArea: false }, // only want the grid lines for one axis to show up
+                    title: { display: true, text: 'Temperature (°C)' }
+                }
+            },
+            animation: false
+        }
+    });
+
+    // --- Server-Sent Events (SSE) Connection ---
+    const eventSource = new EventSource("/stream");
+    const statusBadge = document.getElementById('connectionStatus');
+
+    eventSource.onopen = function() {
+        statusBadge.innerText = "Connected Live";
+        statusBadge.classList.replace('status-offline', 'status-online');
+    };
+
+    eventSource.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+
+            // 1. Update Number Cards
+            // If data is missing (0), it displays 0. You can add logic to show "--" if needed.
+            document.getElementById('ntuValue').innerText = data.ntu;
+            document.getElementById('voltageValue').innerText = data.voltage;
+            
+            document.getElementById('tempValue').innerText = data.temperature || "--";
+            document.getElementById('phValue').innerText = data.ph || "--";
+            document.getElementById('tdsValue').innerText = data.tds || "--";
+
+            // 2. Update Charts
+            const timeNow = new Date().toLocaleTimeString();
+            
+            // Keep only last 30 data points to prevent lag
+            if (mainChart.data.labels.length > 30) {
+                mainChart.data.labels.shift();
+                mainChart.data.datasets[0].data.shift();
+                mainChart.data.datasets[1].data.shift();
+            }
+
+            mainChart.data.labels.push(timeNow);
+            mainChart.data.datasets[0].data.push(data.ntu);
+            mainChart.data.datasets[1].data.push(data.temperature);
+            
+            mainChart.update();
+
+        } catch (e) {
+            console.error("Error parsing JSON:", e);
+        }
+    };
+
+    eventSource.onerror = function() {
+        statusBadge.innerText = "Reconnecting...";
+        statusBadge.classList.replace('status-online', 'status-offline');
+    };
+</script>
+
+</body>
+</html>
