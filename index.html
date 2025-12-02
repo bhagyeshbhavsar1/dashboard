@@ -272,7 +272,6 @@
         const SUPABASE_URL = "https://ndmoabrjopfbqemiancq.supabase.co";
         
         // IMPORTANT: Use the ANON PUBLIC KEY here (Safe for frontend websites)
-        // Do not use the Service_Role key here.
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbW9hYnJqb3BmYnFlbWlhbmNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyNzEwODYsImV4cCI6MjA3OTg0NzA4Nn0.opR1Q4LCwZitzgovaOtTTE-qd-2wKxqwAcgr4AAOa-Y"; 
         
         const TABLE_NAME = "sensor_data"; 
@@ -308,11 +307,11 @@
         // ---------------------------------------------------------
         async function fetchData() {
             try {
-                // Fetch last 20 rows ordered by time
+                // FIXED: Changed 'created_at' to 'timestamp' to match your database
                 const { data, error } = await _supabase
                     .from(TABLE_NAME)
                     .select('*')
-                    .order('created_at', { ascending: false }) // Assuming default created_at or timestamp
+                    .order('timestamp', { ascending: false }) 
                     .limit(20);
 
                 if (error) throw error;
@@ -346,12 +345,13 @@
             document.getElementById('val-ph').innerText = latest.ph_value;
             document.getElementById('val-tds').innerText = latest.tds_value;
             
-            const dateObj = new Date(latest.timestamp || latest.created_at);
+            // FIXED: Using 'timestamp' property
+            const dateObj = new Date(latest.timestamp);
             document.getElementById('last-updated').innerText = dateObj.toLocaleString();
 
             // 2. Update Chart
             chart.data.labels = chartData.map(d => {
-                const t = new Date(d.timestamp || d.created_at);
+                const t = new Date(d.timestamp);
                 return t.getHours() + ":" + t.getMinutes() + ":" + t.getSeconds();
             });
             chart.data.datasets[0].data = chartData.map(d => d.ph_value);
@@ -366,7 +366,7 @@
             data.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${new Date(row.timestamp || row.created_at).toLocaleString()}</td>
+                    <td>${new Date(row.timestamp).toLocaleString()}</td>
                     <td>${row.temperature}</td>
                     <td>${row.turbidity}</td>
                     <td>${row.ph_value}</td>
