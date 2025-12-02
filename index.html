@@ -3,195 +3,384 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Full Sensor Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>National Water Quality Monitoring Dashboard</title>
+    
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
-        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card { border: none; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); transition: transform 0.2s; }
-        .card:hover { transform: translateY(-5px); }
-        .metric-value { font-size: 2.5rem; font-weight: 700; color: #333; }
-        .metric-unit { font-size: 1rem; color: #777; font-weight: normal; }
-        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
-        .status-online { background-color: #d1e7dd; color: #0f5132; }
-        .status-offline { background-color: #f8d7da; color: #842029; }
+        :root {
+            --gov-blue: #003366;
+            --gov-orange: #FF9933;
+            --gov-green: #138808;
+            --text-dark: #333;
+            --bg-light: #f5f5f5;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+        }
+
+        /* --- Header Section --- */
+        .top-strip {
+            background-color: #ddd;
+            font-size: 12px;
+            padding: 5px 10%;
+            text-align: right;
+            border-bottom: 1px solid #ccc;
+        }
+
+        header {
+            background-color: white;
+            padding: 15px 10%;
+            display: flex;
+            align-items: center;
+            border-bottom: 4px solid var(--gov-orange);
+        }
+
+        .emblem {
+            height: 60px;
+            margin-right: 15px;
+        }
+
+        .header-text h1 {
+            margin: 0;
+            font-size: 24px;
+            color: var(--gov-blue);
+            text-transform: uppercase;
+        }
+
+        .header-text h2 {
+            margin: 0;
+            font-size: 14px;
+            color: #555;
+            font-weight: normal;
+        }
+
+        /* --- Navbar --- */
+        nav {
+            background-color: var(--gov-blue);
+            padding: 10px 10%;
+            color: white;
+            font-size: 14px;
+        }
+
+        /* --- Main Content --- */
+        .container {
+            width: 80%;
+            margin: 20px auto;
+            background: white;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border: 1px solid #e0e0e0;
+        }
+
+        .section-title {
+            color: var(--gov-blue);
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        /* --- Metrics Grid --- */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            border: 1px solid #ddd;
+            background: #f9f9f9;
+            padding: 15px;
+            text-align: center;
+            border-top: 3px solid var(--gov-blue);
+        }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #555;
+            text-transform: uppercase;
+        }
+
+        .card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--gov-blue);
+        }
+
+        .card .unit {
+            font-size: 12px;
+            color: #777;
+        }
+
+        /* --- Chart Section --- */
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            margin-bottom: 30px;
+            border: 1px solid #eee;
+            padding: 10px;
+        }
+
+        /* --- Table Section --- */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        table th {
+            background-color: var(--gov-blue);
+            color: white;
+        }
+
+        table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        /* --- Footer --- */
+        footer {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            margin-top: 40px;
+        }
         
-        /* Specific Colors for Sensors */
-        .border-left-blue { border-left: 5px solid #0d6efd; }
-        .border-left-red { border-left: 5px solid #dc3545; }
-        .border-left-green { border-left: 5px solid #198754; }
-        .border-left-purple { border-left: 5px solid #6f42c1; }
+        .status-blink {
+            color: green;
+            font-weight: bold;
+            animation: blinker 2s linear infinite;
+        }
+        
+        @keyframes blinker {
+            50% { opacity: 0; }
+        }
     </style>
 </head>
 <body>
 
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="mb-0">💧 Water Quality Monitor</h2>
-            <small class="text-muted">Real-time Sensor Data</small>
-        </div>
-        <div id="connectionStatus" class="status-badge status-offline">
-            Disconnected
-        </div>
+    <!-- Top Strip -->
+    <div class="top-strip">
+        Government of India | Ministry of Jal Shakti
     </div>
 
-    <div class="row g-4 mb-4">
+    <!-- Header -->
+    <header>
+        <!-- Using a placeholder for the emblem -->
+        <img src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg" alt="Satyamev Jayate" class="emblem">
+        <div class="header-text">
+            <h1>Jyotirvega Dashboard</h1>
+        </div>
+    </header>
+
+    <!-- Navbar -->
+    <nav>
+        Home &nbsp;|&nbsp; Reports &nbsp;|&nbsp;  Analytics &nbsp;|&nbsp; Contact Us
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container">
         
-        <div class="col-md-3 col-sm-6">
-            <div class="card h-100 p-3 border-left-blue">
-                <h6 class="text-muted text-uppercase mb-2">Turbidity</h6>
-                <div class="d-flex align-items-baseline">
-                    <span id="ntuValue" class="metric-value">--</span>
-                    <span class="metric-unit ms-1">NTU</span>
-                </div>
-                <small class="text-muted mt-2">Voltage: <span id="voltageValue">--</span> V</small>
+        <!-- Live Status -->
+        <div style="text-align: right; margin-bottom: 10px; font-size: 13px;">
+            System Status: <span class="status-blink" id="sys-status">Connecting...</span> | Last Updated: <span id="last-updated">--</span>
+        </div>
+
+        <div class="section-title">Current Real-time Parameters</div>
+
+        <!-- Metric Cards -->
+        <div class="metrics-grid">
+            <div class="card">
+                <h3>Temperature</h3>
+                <div class="value" id="val-temp">--</div>
+                <div class="unit">Celsius (°C)</div>
+            </div>
+            <div class="card">
+                <h3>Turbidity</h3>
+                <div class="value" id="val-turb">--</div>
+                <div class="unit">NTU</div>
+            </div>
+            <div class="card">
+                <h3>pH Level</h3>
+                <div class="value" id="val-ph">--</div>
+                <div class="unit">pH Scale</div>
+            </div>
+            <div class="card">
+                <h3>TDS Value</h3>
+                <div class="value" id="val-tds">--</div>
+                <div class="unit">ppm</div>
             </div>
         </div>
 
-        <div class="col-md-3 col-sm-6">
-            <div class="card h-100 p-3 border-left-red">
-                <h6 class="text-muted text-uppercase mb-2">Temperature</h6>
-                <div class="d-flex align-items-baseline">
-                    <span id="tempValue" class="metric-value">--</span>
-                    <span class="metric-unit ms-1">°C</span>
-                </div>
-                <small id="tempStatus" class="text-success mt-2">Normal</small>
-            </div>
+        <div class="section-title">Historical Trends (Last 20 Readings)</div>
+        
+        <!-- Chart -->
+        <div class="chart-container">
+            <canvas id="qualityChart"></canvas>
         </div>
 
-        <div class="col-md-3 col-sm-6">
-            <div class="card h-100 p-3 border-left-green">
-                <h6 class="text-muted text-uppercase mb-2">pH Level</h6>
-                <div class="d-flex align-items-baseline">
-                    <span id="phValue" class="metric-value">--</span>
-                    <span class="metric-unit ms-1">pH</span>
-                </div>
-                <small class="text-muted mt-2">Target: 6.5 - 8.5</small>
-            </div>
-        </div>
+        <!-- Data Table -->
+        <div class="section-title">Recent Data Log</div>
+        <table id="dataTable">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Temperature (°C)</th>
+                    <th>Turbidity (NTU)</th>
+                    <th>pH Value</th>
+                    <th>TDS (ppm)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="5" style="text-align:center;">Loading Data...</td></tr>
+            </tbody>
+        </table>
 
-        <div class="col-md-3 col-sm-6">
-            <div class="card h-100 p-3 border-left-purple">
-                <h6 class="text-muted text-uppercase mb-2">TDS Value</h6>
-                <div class="d-flex align-items-baseline">
-                    <span id="tdsValue" class="metric-value">--</span>
-                    <span class="metric-unit ms-1">ppm</span>
-                </div>
-                <small class="text-muted mt-2">Total Dissolved Solids</small>
-            </div>
-        </div>
     </div>
 
-    <div class="row">
-        <div class="col-12">
-            <div class="card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">Live Trends</h5>
-                    </div>
-                <canvas id="mainChart" height="80"></canvas>
-            </div>
-        </div>
-    </div>
-</div>
+    <!-- Footer -->
+    <footer>
+        <div>Designed and Developed by Water Monitoring Division</div>
+        <div>Content owned by the District Administration</div>
+    </footer>
 
-<script>
-    // --- Chart Setup ---
-    const ctx = document.getElementById('mainChart').getContext('2d');
-    const mainChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [
-                {
-                    label: 'Turbidity (NTU)',
-                    data: [],
-                    borderColor: '#0d6efd',
-                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                    yAxisID: 'y',
-                    fill: true
-                },
-                {
-                    label: 'Temperature (°C)',
-                    data: [],
-                    borderColor: '#dc3545',
-                    borderDash: [5, 5], // Dashed line for Temp
-                    yAxisID: 'y1',
-                    fill: false
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            interaction: { mode: 'index', intersect: false },
-            scales: {
-                x: { display: false },
-                y: { 
-                    type: 'linear', 
-                    display: true, 
-                    position: 'left',
-                    title: { display: true, text: 'Turbidity (NTU)' }
-                },
-                y1: { 
-                    type: 'linear', 
-                    display: true, 
-                    position: 'right',
-                    grid: { drawOnChartArea: false }, // only want the grid lines for one axis to show up
-                    title: { display: true, text: 'Temperature (°C)' }
-                }
+    <!-- LOGIC SCRIPT -->
+    <script>
+        // ---------------------------------------------------------
+        // 1. CONFIGURATION (REPLACE KEYS HERE)
+        // ---------------------------------------------------------
+        const SUPABASE_URL = "https://ndmoabrjopfbqemiancq.supabase.co";
+        
+        // IMPORTANT: Use the ANON PUBLIC KEY here (Safe for frontend websites)
+        // Do not use the Service_Role key here.
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbW9hYnJqb3BmYnFlbWlhbmNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyNzEwODYsImV4cCI6MjA3OTg0NzA4Nn0.opR1Q4LCwZitzgovaOtTTE-qd-2wKxqwAcgr4AAOa-Y"; 
+        
+        const TABLE_NAME = "sensor_data"; 
+
+        // Initialize Supabase
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Chart Initialization
+        const ctx = document.getElementById('qualityChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'pH Value', data: [], borderColor: '#138808', tension: 0.1 }, // Green
+                    { label: 'Turbidity', data: [], borderColor: '#FF9933', tension: 0.1 }, // Orange
+                    { label: 'Temperature', data: [], borderColor: '#003366', tension: 0.1 } // Blue
+                ]
             },
-            animation: false
-        }
-    });
-
-    // --- Server-Sent Events (SSE) Connection ---
-    const eventSource = new EventSource("/stream");
-    const statusBadge = document.getElementById('connectionStatus');
-
-    eventSource.onopen = function() {
-        statusBadge.innerText = "Connected Live";
-        statusBadge.classList.replace('status-offline', 'status-online');
-    };
-
-    eventSource.onmessage = function(event) {
-        try {
-            const data = JSON.parse(event.data);
-
-            // 1. Update Number Cards
-            // If data is missing (0), it displays 0. You can add logic to show "--" if needed.
-            document.getElementById('ntuValue').innerText = data.ntu;
-            document.getElementById('voltageValue').innerText = data.voltage;
-            
-            document.getElementById('tempValue').innerText = data.temperature || "--";
-            document.getElementById('phValue').innerText = data.ph || "--";
-            document.getElementById('tdsValue').innerText = data.tds || "--";
-
-            // 2. Update Charts
-            const timeNow = new Date().toLocaleTimeString();
-            
-            // Keep only last 30 data points to prevent lag
-            if (mainChart.data.labels.length > 30) {
-                mainChart.data.labels.shift();
-                mainChart.data.datasets[0].data.shift();
-                mainChart.data.datasets[1].data.shift();
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true }
+                }
             }
+        });
 
-            mainChart.data.labels.push(timeNow);
-            mainChart.data.datasets[0].data.push(data.ntu);
-            mainChart.data.datasets[1].data.push(data.temperature);
-            
-            mainChart.update();
+        // ---------------------------------------------------------
+        // 2. FETCH DATA FUNCTION
+        // ---------------------------------------------------------
+        async function fetchData() {
+            try {
+                // Fetch last 20 rows ordered by time
+                const { data, error } = await _supabase
+                    .from(TABLE_NAME)
+                    .select('*')
+                    .order('created_at', { ascending: false }) // Assuming default created_at or timestamp
+                    .limit(20);
 
-        } catch (e) {
-            console.error("Error parsing JSON:", e);
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    updateDashboard(data);
+                    document.getElementById('sys-status').innerText = "Online";
+                    document.getElementById('sys-status').style.color = "green";
+                } else {
+                    document.getElementById('sys-status').innerText = "No Data";
+                }
+
+            } catch (err) {
+                console.error("Supabase Error:", err);
+                document.getElementById('sys-status').innerText = "Connection Error";
+                document.getElementById('sys-status').style.color = "red";
+            }
         }
-    };
 
-    eventSource.onerror = function() {
-        statusBadge.innerText = "Reconnecting...";
-        statusBadge.classList.replace('status-online', 'status-offline');
-    };
-</script>
+        // ---------------------------------------------------------
+        // 3. UPDATE UI FUNCTION
+        // ---------------------------------------------------------
+        function updateDashboard(data) {
+            // Data comes in newest first. For chart we need oldest first.
+            const chartData = [...data].reverse();
+            const latest = data[0];
 
+            // 1. Update Top Cards
+            document.getElementById('val-temp').innerText = latest.temperature;
+            document.getElementById('val-turb').innerText = latest.turbidity;
+            document.getElementById('val-ph').innerText = latest.ph_value;
+            document.getElementById('val-tds').innerText = latest.tds_value;
+            
+            const dateObj = new Date(latest.timestamp || latest.created_at);
+            document.getElementById('last-updated').innerText = dateObj.toLocaleString();
+
+            // 2. Update Chart
+            chart.data.labels = chartData.map(d => {
+                const t = new Date(d.timestamp || d.created_at);
+                return t.getHours() + ":" + t.getMinutes() + ":" + t.getSeconds();
+            });
+            chart.data.datasets[0].data = chartData.map(d => d.ph_value);
+            chart.data.datasets[1].data = chartData.map(d => d.turbidity);
+            chart.data.datasets[2].data = chartData.map(d => d.temperature);
+            chart.update();
+
+            // 3. Update Table
+            const tbody = document.querySelector('#dataTable tbody');
+            tbody.innerHTML = ''; // Clear old rows
+            
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${new Date(row.timestamp || row.created_at).toLocaleString()}</td>
+                    <td>${row.temperature}</td>
+                    <td>${row.turbidity}</td>
+                    <td>${row.ph_value}</td>
+                    <td>${row.tds_value}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ---------------------------------------------------------
+        // 4. RUN LOOP
+        // ---------------------------------------------------------
+        fetchData(); // Run immediately
+        setInterval(fetchData, 5000); // Refresh every 5 seconds
+    </script>
 </body>
 </html>
